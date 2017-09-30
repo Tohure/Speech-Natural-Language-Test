@@ -39,14 +39,27 @@ public class MainActivity extends AppCompatActivity {
 
     private final String CLOUD_API_KEY = "ABCDEG1234567";
     private String base64EncodedData;
-    private TextView speechToTextResult;
+    private TextView speechToTextResult, textToResult;
     private String language = "en-US";
+    private CloudNaturalLanguage naturalLanguageService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        speechToTextResult = (TextView) findViewById(R.id.speech_text_result);
+        speechToTextResult = (TextView) findViewById(R.id.speech_result);
+        textToResult = (TextView) findViewById(R.id.speech_text);
+        setUpLanguageApi();
+    }
+
+    private void setUpLanguageApi() {
+        naturalLanguageService = new CloudNaturalLanguage.Builder(
+                AndroidHttp.newCompatibleTransport(),
+                new AndroidJsonFactory(),
+                null
+        ).setCloudNaturalLanguageRequestInitializer(
+                new CloudNaturalLanguageRequestInitializer(CLOUD_API_KEY)
+        ).build();
     }
 
     public void launchSelector(View view) {
@@ -55,22 +68,32 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(filePicker, 1);
     }
 
-    public void topicAnalize(View view) {
-        Toast.makeText(this, "Analizando texto", Toast.LENGTH_LONG).show();
+    public void topicAnalizeText(View view) {
+        makeDocument(textToResult.getText().toString(), "Analizando texto");
+    }
 
-        final CloudNaturalLanguage naturalLanguageService = new CloudNaturalLanguage.Builder(
-                AndroidHttp.newCompatibleTransport(),
-                new AndroidJsonFactory(),
-                null
-        ).setCloudNaturalLanguageRequestInitializer(
-                new CloudNaturalLanguageRequestInitializer(CLOUD_API_KEY)
-        ).build();
+    public void topicAnalize(View view) {
+        makeDocument(speechToTextResult.getText().toString(), "Analizando texto del audio");
+    }
+
+    private void makeDocument(String textToAnalyce, String titleToast) {
+        Toast toast = Toast.makeText(this, titleToast, Toast.LENGTH_LONG);
+        toast.show();
 
         Document document = new Document();
         document.setType("PLAIN_TEXT");
-        document.setLanguage(language);
-        document.setContent(speechToTextResult.getText().toString());
 
+        if (textToAnalyce.length() == 0) {
+            toast.cancel();
+            toast = Toast.makeText(this, "Texto vacío", Toast.LENGTH_SHORT);
+            toast.show();
+        } else {
+            document.setContent(textToAnalyce);
+            makeRequest(document);
+        }
+    }
+
+    private void makeRequest(Document document) {
         Features features = new Features();
         features.setExtractEntities(true);
         features.setExtractDocumentSentiment(true);
@@ -79,10 +102,10 @@ public class MainActivity extends AppCompatActivity {
         request.setDocument(document);
         request.setFeatures(features);
 
-        getAsyncResponse(naturalLanguageService, request);
+        getAsyncResponse(request);
     }
 
-    private void getAsyncResponse(final CloudNaturalLanguage naturalLanguageService, final AnnotateTextRequest request) {
+    private void getAsyncResponse(final AnnotateTextRequest request) {
         AsyncTask.execute(new Runnable() {
             @Override
             public void run() {
@@ -117,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 AlertDialog dialog = new AlertDialog.Builder(MainActivity.this)
                         .setTitle("Opinión " + sentiment_title + " --> " + sentiment)
-                        .setMessage("Este audio habla acerca de : \n\n" + entities)
+                        .setMessage("Este texto habla acerca de : \n\n" + entities)
                         .setNeutralButton("Ok", null)
                         .create();
                 dialog.show();

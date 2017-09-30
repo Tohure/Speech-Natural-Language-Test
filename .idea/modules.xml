@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/Speech-Natural-Language-Test.iml" filepath="$PROJECT_DIR$/Speech-Natural-Language-Test.iml" />
       <module fileurl="file://$PROJECT_DIR$/SpeechNaturalLanguageTest.iml" filepath="$PROJECT_DIR$/SpeechNaturalLanguageTest.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
     </modules>

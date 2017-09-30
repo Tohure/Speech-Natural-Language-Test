@@ -26,8 +26,8 @@ dependencies {
     })
     compile 'com.android.support:appcompat-v7:26+'
     compile 'com.google.api-client:google-api-client-android:1.22.0'
-    compile 'com.google.apis:google-api-services-speech:v1beta1-rev336-1.22.0'
-    compile 'com.google.apis:google-api-services-language:v1beta2-rev6-1.22.0'
+    compile 'com.google.apis:google-api-services-speech:v1beta1-rev347-1.22.0'
+    compile 'com.google.apis:google-api-services-language:v1-rev392-1.22.0'
     compile 'com.google.code.findbugs:jsr305:2.0.1'
     compile 'commons-io:commons-io:2.5'
 

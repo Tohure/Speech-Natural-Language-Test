@@ -4,15 +4,23 @@ import android.content.Intent;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.AsyncTask;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
+import android.support.v7.app.AlertDialog;
+import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.api.client.extensions.android.http.AndroidHttp;
 import com.google.api.client.extensions.android.json.AndroidJsonFactory;
 import com.google.api.client.util.Base64;
+import com.google.api.services.language.v1.CloudNaturalLanguage;
+import com.google.api.services.language.v1.CloudNaturalLanguageRequestInitializer;
+import com.google.api.services.language.v1.model.AnnotateTextRequest;
+import com.google.api.services.language.v1.model.AnnotateTextResponse;
+import com.google.api.services.language.v1.model.Document;
+import com.google.api.services.language.v1.model.Entity;
+import com.google.api.services.language.v1.model.Features;
 import com.google.api.services.speech.v1beta1.Speech;
 import com.google.api.services.speech.v1beta1.SpeechRequestInitializer;
 import com.google.api.services.speech.v1beta1.model.RecognitionAudio;
@@ -25,18 +33,20 @@ import org.apache.commons.io.IOUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
     private final String CLOUD_API_KEY = "ABCDEG1234567";
     private String base64EncodedData;
     private TextView speechToTextResult;
+    private String language = "en-US";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        speechToTextResult = (TextView) findViewById(R.id.speech_to_text_result);
+        speechToTextResult = (TextView) findViewById(R.id.speech_text_result);
     }
 
     public void launchSelector(View view) {
@@ -44,6 +54,77 @@ public class MainActivity extends AppCompatActivity {
         filePicker.setType("audio/flac");
         startActivityForResult(filePicker, 1);
     }
+
+    public void topicAnalize(View view) {
+        Toast.makeText(this, "Analizando texto", Toast.LENGTH_LONG).show();
+
+        final CloudNaturalLanguage naturalLanguageService = new CloudNaturalLanguage.Builder(
+                AndroidHttp.newCompatibleTransport(),
+                new AndroidJsonFactory(),
+                null
+        ).setCloudNaturalLanguageRequestInitializer(
+                new CloudNaturalLanguageRequestInitializer(CLOUD_API_KEY)
+        ).build();
+
+        Document document = new Document();
+        document.setType("PLAIN_TEXT");
+        document.setLanguage(language);
+        document.setContent(speechToTextResult.getText().toString());
+
+        Features features = new Features();
+        features.setExtractEntities(true);
+        features.setExtractDocumentSentiment(true);
+
+        final AnnotateTextRequest request = new AnnotateTextRequest();
+        request.setDocument(document);
+        request.setFeatures(features);
+
+        getAsyncResponse(naturalLanguageService, request);
+    }
+
+    private void getAsyncResponse(final CloudNaturalLanguage naturalLanguageService, final AnnotateTextRequest request) {
+        AsyncTask.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    showResponseInDialog(naturalLanguageService.documents().annotateText(request).execute());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+
+    private void showResponseInDialog(AnnotateTextResponse response) {
+        final List<Entity> entityList = response.getEntities();
+        final float sentiment = response.getDocumentSentiment().getScore();
+        final String sentiment_title;
+
+        if (sentiment == 0) {
+            sentiment_title = "Neutral";
+        } else if (sentiment < 0) {
+            sentiment_title = "Negativa";
+        } else {
+            sentiment_title = "Positiva";
+        }
+
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                String entities = "";
+                for (Entity entity : entityList) {
+                    entities += "\n" + entity.getName().toUpperCase();
+                }
+                AlertDialog dialog = new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("Opinión " + sentiment_title + " --> " + sentiment)
+                        .setMessage("Este audio habla acerca de : \n\n" + entities)
+                        .setNeutralButton("Ok", null)
+                        .create();
+                dialog.show();
+            }
+        });
+    }
+
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -80,6 +161,8 @@ public class MainActivity extends AppCompatActivity {
         player.prepare();
         player.start();
 
+        printTextUiThread("Transcribiendo audio . . .");
+
         // Release the player
         player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
@@ -92,13 +175,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void launchSpeech(String base64EncodedData) throws IOException {
-        Speech speechService =
-                new Speech.Builder(AndroidHttp.newCompatibleTransport(),
-                        new AndroidJsonFactory(), null).setSpeechRequestInitializer(
-                        new SpeechRequestInitializer(CLOUD_API_KEY)).build();
+        Speech speechService = new Speech.Builder(AndroidHttp.newCompatibleTransport(),
+                new AndroidJsonFactory(), null).setSpeechRequestInitializer(
+                new SpeechRequestInitializer(CLOUD_API_KEY)).build();
 
         RecognitionConfig recognitionConfig = new RecognitionConfig();
-        recognitionConfig.setLanguageCode("en-US");
+        recognitionConfig.setLanguageCode(language);
 
         RecognitionAudio recognitionAudio = new RecognitionAudio();
         recognitionAudio.setContent(base64EncodedData);
@@ -112,16 +194,20 @@ public class MainActivity extends AppCompatActivity {
         SyncRecognizeResponse response;
         response = speechService.speech().syncrecognize(request).execute();
 
-
         // Extract transcript
         SpeechRecognitionResult result = response.getResults().get(0);
         final String transcript = result.getAlternatives().get(0).getTranscript();
 
+        printTextUiThread(transcript);
+    }
+
+    private void printTextUiThread(final String text) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                speechToTextResult.setText(transcript);
+                speechToTextResult.setText(text);
             }
         });
     }
+
 }
